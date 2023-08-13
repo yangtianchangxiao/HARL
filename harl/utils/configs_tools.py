@@ -47,7 +47,9 @@ def update_args(unparsed_dict, *args):
 
 def get_task_name(env, env_args):
     """Get task name."""
-    if env == "smac":
+    if env == "EnvDrone4":
+        task = "EnvDrone4" # define task name
+    elif env == "smac":
         task = env_args["map_name"]
     elif env == "smacv2":
         task = env_args["map_name"]
@@ -82,6 +84,7 @@ def init_dir(env, env_args, algo, exp_name, seed, logger_path):
         "-".join(["seed-{:0>5}".format(seed), hms_time]),
     )
     log_path = os.path.join(results_path, "logs")
+    print("results_path: ", results_path)
     os.makedirs(log_path, exist_ok=True)
     from tensorboardX import SummaryWriter
 

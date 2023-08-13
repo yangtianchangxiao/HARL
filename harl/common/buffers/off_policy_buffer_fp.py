@@ -69,10 +69,10 @@ class OffPolicyBufferFP(OffPolicyBufferBase):
             )
 
         # compute the indices along n steps
-        indice = np.repeat(np.expand_dims(indice, axis=-1), self.num_agents, axis=-1)  # (batch_size, n_agents)
-        indices = [indice]
-        for _ in range(self.n_step - 1):
-            indices.append(self.next(indices[-1]))
+            indice = np.repeat(np.expand_dims(indice, axis=-1), self.num_agents, axis=-1)  # (batch_size, n_agents)
+        indices = [indice] # each element in the list is a 2-d array with shape (batch_size, n_agents)
+        for _ in range(self.n_step - 1): 
+            indices.append(self.next(indices[-1])) # get the next indices, each indice is a 2-d array with shape (batch_size, n_agents)
 
         # get data at the last indice
         sp_done = np.concatenate(

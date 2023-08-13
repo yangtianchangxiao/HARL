@@ -60,7 +60,7 @@ class LAGEnv:
             env = SingleControlEnv(env_args["task"])
         elif env_args["scenario"] == "MultipleCombat":
             env = MultipleCombatEnv(env_args["task"])
-        else:
+        elif env_args["scenario"] == "MultipleControl":
             print("Can not support the " + env_args["scenario"] + "environment.")
             raise NotImplementedError
         return env

@@ -6,26 +6,26 @@ seed:
   seed: 1
 device:
   # whether to use CUDA
-  cuda: True
+  cuda: 3
   # whether to set CUDA deterministic
-  cuda_deterministic: True
+  cuda_deterministic: True 
   # arg to torch.set_num_threads
-  torch_threads: 4
+  torch_threads: 20 # n_training_threads
 train:
   # number of parallel environments for training data collection
   n_rollout_threads: 20
   # number of total steps
   num_env_steps: 20000000
   # number of warmup steps
-  warmup_steps: 10000
+  warmup_steps: 50000
   # number of steps per train
-  train_interval: 50
+  train_interval: 300
   # ratio of training iterations to train_interval
-  update_per_train: 1
+  update_per_train: 0.5
   # logging interval (currently unused)
   log_interval: ~
   # evaluation interval
-  eval_interval: 10000
+  eval_interval: 1000
   # whether to use ValueNorm
   use_valuenorm: True
   # whether to use linear learning rate decay
@@ -33,10 +33,10 @@ train:
   # whether to consider the case of truncation when an episode is done
   use_proper_time_limits: True
   # if set, load models from this directory; otherwise, randomly initialise the models
-  model_dir: ~
+  model_dir: /home/cx/HARL/examples/results/EnvDrone4/EnvDrone4/hasac/test/seed-00001-2023-08-12-21-23-47/models
 eval:
   # whether to use evaluation
-  use_eval: True
+  use_eval: True # Just training, not do evaluation during the process.
   # number of parallel environments for evaluation
   n_eval_rollout_threads: 20
   # number of episodes per evaluation
@@ -62,22 +62,26 @@ model:
   gain: 0.01
   # optimizer parameters
   # actor learning rate
-  lr: 0.0005
+  lr: 0.0001
   # critic learning rate
-  critic_lr: 0.0005
+  critic_lr: 0.0001
+  # attention parameters
+  d_model: 32
+  nhead: 4
+  dropout_prob: 0
 algo:
   # whether to auto-tune temperature
-  auto_alpha: False
+  auto_alpha: True
   # temperature parameter
   alpha: 0.001
   # alpha learning rate
-  alpha_lr: 0.0003
+  alpha_lr: 0.0001
   # discount factor
   gamma: 0.99
   # off-policy buffer size
   buffer_size: 1000000
   # training batch size
-  batch_size: 1000
+  batch_size: 3000
   # coefficient for target model soft update
   polyak: 0.005
   # the number of steps to look ahead

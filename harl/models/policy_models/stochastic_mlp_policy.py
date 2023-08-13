@@ -4,6 +4,9 @@ from harl.utils.envs_tools import check, get_shape_from_obs_space
 from harl.models.base.cnn import CNNBase
 from harl.models.base.mlp import MLPBase
 from harl.models.base.act import ACTLayer
+import sys
+sys.path.append("/home/cx/")
+from happo.algorithms.utils.attention_resnet_120 import Attention_model as Attention_model_resnet_120
 
 
 class StochasticMlpPolicy(nn.Module):
@@ -26,7 +29,8 @@ class StochasticMlpPolicy(nn.Module):
         self.tpdv = dict(dtype=torch.float32, device=device)
 
         obs_shape = get_shape_from_obs_space(obs_space)
-        base = CNNBase if len(obs_shape) == 3 else MLPBase
+        # base = CNNBase if len(obs_shape) == 3 else MLPBase
+        base = Attention_model_resnet_120
         self.base = base(args, obs_shape)
         self.act = ACTLayer(
             action_space,

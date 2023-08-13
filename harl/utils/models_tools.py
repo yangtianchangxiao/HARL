@@ -12,15 +12,16 @@ def init_device(args):
     Returns:
         device: (torch.device) device
     """
-    if args["cuda"] and torch.cuda.is_available():
+    if args["cuda"] in range(4) and torch.cuda.is_available():
         print("choose to use gpu...")
-        device = torch.device("cuda:0")
+        device = torch.device(f"""cuda:{args["cuda"]}""")
         if args["cuda_deterministic"]:
             torch.backends.cudnn.benchmark = False
             torch.backends.cudnn.deterministic = True
     else:
         print("choose to use cpu...")
         device = torch.device("cpu")
+    print(args["cuda"], torch.cuda.is_available(),'is cuda available')
     torch.set_num_threads(args["torch_threads"])
     return device
 

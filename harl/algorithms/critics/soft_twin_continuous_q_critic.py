@@ -44,7 +44,7 @@ class SoftTwinContinuousQCritic(TwinContinuousQCritic):
 
     def update_alpha(self, logp_actions, target_entropy):
         """Auto-tune the temperature parameter alpha."""
-        log_prob = (
+        log_prob = ( 
             torch.sum(torch.cat(logp_actions, dim=-1), dim=-1, keepdim=True)
             .detach()
             .to(**self.tpdv)

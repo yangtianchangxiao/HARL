@@ -107,11 +107,13 @@ class OffPolicyBufferBase:
         if self.idx + length <= self.buffer_size:  # no overflow
             s = self.idx
             e = self.idx + length
-            self.share_obs[s:e] = share_obs.copy()
-            self.rewards[s:e] = reward.copy()
+            # print("self.share_obs[s:e] shape: ", self.share_obs[s:e].shape)
+            # print("share_obs shape: ", share_obs.shape)
+            self.share_obs[s:e, :] = share_obs[:, np.newaxis, :].copy()
+            self.rewards[s:e] = reward[:, :, np.newaxis].copy()
             self.dones[s:e] = done.copy()
             self.terms[s:e] = term.copy()
-            self.next_share_obs[s:e] = next_share_obs.copy()
+            self.next_share_obs[s:e] = next_share_obs[:, np.newaxis, :].copy()
             for agent_id in range(self.num_agents):
                 self.obs[agent_id][s:e] = obs[agent_id].copy()
                 self.actions[agent_id][s:e] = actions[agent_id].copy()

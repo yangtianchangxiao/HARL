@@ -1,6 +1,12 @@
 """Train an algorithm."""
 import argparse
 import json
+import sys
+import os
+import yaml
+import pickle
+
+sys.path.append('/home/cx/HARL')
 from harl.utils.configs_tools import get_defaults_yaml_args, update_args
 
 
@@ -29,7 +35,7 @@ def main():
     parser.add_argument(
         "--env",
         type=str,
-        default="pettingzoo_mpe",
+        default="EnvDrone4",
         choices=[
             "smac",
             "mamujoco",
@@ -39,6 +45,7 @@ def main():
             "dexhands",
             "smacv2",
             "lag",
+            "EnvDrone4"
         ],
         help="Environment name. Choose from: smac, mamujoco, pettingzoo_mpe, gym, football, dexhands, smacv2, lag.",
     )
@@ -48,7 +55,7 @@ def main():
     parser.add_argument(
         "--load_config",
         type=str,
-        default="",
+        default="Envdrone4",
         help="If set, load existing experiment config file instead of reading from yaml config file.",
     )
     args, unparsed_args = parser.parse_known_args()
@@ -63,7 +70,20 @@ def main():
     values = [process(v) for v in unparsed_args[1::2]]
     unparsed_dict = {k: v for k, v in zip(keys, values)}
     args = vars(args)  # convert to dict
-    if args["load_config"] != "":  # load config from existing config file
+    
+
+    if args["load_config"] == "Envdrone4":  # load config from corresponding yaml file
+        base_path = os.path.split(os.path.dirname(os.path.abspath(__file__)))[0]
+        algo_cfg_path = os.path.join(base_path, "harl", "configs", "algos_cfgs", "hasac.yaml")
+        with open(algo_cfg_path, "r", encoding="utf-8") as file:
+            algo_args = yaml.load(file, Loader=yaml.FullLoader)
+            env_args = {
+            "state_type": "FP",
+            "another_key": "another_value",
+            # ... 更多的键值对
+            }
+
+    elif args["load_config"] != "":  # load config from existing config file
         with open(args["load_config"], encoding="utf-8") as file:
             all_config = json.load(file)
         args["algo"] = all_config["main_args"]["algo"]
@@ -71,9 +91,9 @@ def main():
         args["exp_name"] = all_config["main_args"]["exp_name"]
         algo_args = all_config["algo_args"]
         env_args = all_config["env_args"]
-    else:  # load config from corresponding yaml file
+    else:
         algo_args, env_args = get_defaults_yaml_args(args["algo"], args["env"])
-    update_args(unparsed_dict, algo_args, env_args)  # update args from command line
+    # update_args(unparsed_dict, algo_args, env_args)  # update args from command line
 
     if args["env"] == "dexhands":
         import isaacgym  # isaacgym has to be imported before PyTorch
@@ -83,10 +103,23 @@ def main():
         algo_args["eval"]["use_eval"] = False
         algo_args["train"]["episode_length"] = env_args["hands_episode_length"]
 
+
+    # env
+    train_path = os.path.join('/home/cx/happo', 'light_mappo/envs', 'resize_scale_120', 'train_data.pickle')
+    # test_path = os.path.join('D:', '\code', 'resize_scale_120', 'test_data.pickle')
+    with open(train_path, 'rb') as tp:
+        data = pickle.load(tp)
+    
+    # record the index of map where all the targets are found during training
+    with open ("/home/cx/happo/envs/EnvDrone/classic_control/map_index.txt","w") as w:
+        w.truncate(0)
+
+    
+    map_num = len(data)
+
     # start training
     from harl.runners import RUNNER_REGISTRY
-
-    runner = RUNNER_REGISTRY[args["algo"]](args, algo_args, env_args)
+    runner = RUNNER_REGISTRY[args["algo"]](args, algo_args, env_args, mapset = data, map_num = map_num)
     runner.run()
     runner.close()
 

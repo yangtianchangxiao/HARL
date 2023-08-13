@@ -25,7 +25,7 @@ from harl.common.buffers.off_policy_buffer_fp import OffPolicyBufferFP
 class OffPolicyBaseRunner:
     """Base runner for off-policy algorithms."""
 
-    def __init__(self, args, algo_args, env_args):
+    def __init__(self, args, algo_args, env_args, mapset, map_num):
         """Initialize the OffPolicyBaseRunner class.
         Args:
             args: command-line arguments parsed by argparse. Three keys: algo, env, exp_name.
@@ -35,6 +35,8 @@ class OffPolicyBaseRunner:
         self.args = args
         self.algo_args = algo_args
         self.env_args = env_args
+        self.eval_avg_rew = -100
+        self.last_eval_avg_rew = -100
 
         if "policy_freq" in self.algo_args["algo"]:
             self.policy_freq = self.algo_args["algo"]["policy_freq"]
@@ -64,7 +66,7 @@ class OffPolicyBaseRunner:
         setproctitle.setproctitle(
             str(args["algo"]) + "-" + str(args["env"]) + "-" + str(args["exp_name"])
         )
-
+        
         # env
         if self.algo_args["render"]["use_render"]:  # make envs for rendering
             (
@@ -80,6 +82,8 @@ class OffPolicyBaseRunner:
                 algo_args["seed"]["seed"],
                 algo_args["train"]["n_rollout_threads"],
                 env_args,
+                mapset,
+                map_num,
             )
             self.eval_envs = (
                 make_eval_env(
@@ -87,11 +91,15 @@ class OffPolicyBaseRunner:
                     algo_args["seed"]["seed"],
                     algo_args["eval"]["n_eval_rollout_threads"],
                     env_args,
+                    mapset,
+                    map_num,
                 )
                 if algo_args["eval"]["use_eval"]
                 else None
             )
         self.num_agents = get_num_agents(args["env"], env_args, self.envs)
+        print("num_agents: ", self.num_agents)
+        print("self.argo_args['train']['n_rollout_threads']: ", self.algo_args["train"]["n_rollout_threads"])
         self.agent_deaths = np.zeros(
             (self.algo_args["train"]["n_rollout_threads"], self.num_agents, 1)
         )
@@ -142,6 +150,17 @@ class OffPolicyBaseRunner:
                 self.state_type,
                 device=self.device,
             )
+        
+
+        #     Environment-Provided (EP)：在某些环境中，所有的 agent 都共享同样的观察信息和奖励。例如，考虑一个协同驾驶环境，
+        #    其中多个 agent 都在同一个车辆上工作，他们的任务是控制车辆的不同部分（如方向盘，刹车，油门等）。在这种情况下，所有的 agent 都可以看到车辆的全局状态
+        #    （如速度，方向，周围车辆的位置等），并且他们共享同一个奖励，即车辆的行驶效率或安全性。在这种情境下，Environment-Provided (EP) 状态更适合，
+        #    因为我们可以将全局状态和奖励存储一次，而不需要为每个 agent 存储一次。
+           
+        #    Feature-Pruned (FP)：在其他环境中，每个 agent 都有自己的观察信息和奖励。例如，考虑一个多玩家在线对战游戏，比如 Dota 或者 StarCraft。
+        #    在这些游戏中，每个 agent（玩家或者游戏角色）都有自己的视角，可以看到自己周围的环境，但看不到其他 agent 的视角。
+        #    此外，每个 agent 也有自己的奖励，比如击杀敌方单位，获取金币等。在这种情境下，Feature-Pruned (FP) 状态更适合，因为我们需要为每个 agent 存储自己的观察信息和奖励。
+
             if self.state_type == "EP":
                 self.buffer = OffPolicyBufferEP(
                     {**algo_args["train"], **algo_args["model"], **algo_args["algo"]},
@@ -158,7 +177,8 @@ class OffPolicyBaseRunner:
                     self.envs.observation_space,
                     self.envs.action_space,
                 )
-            else:
+            # the joint shape's state is EP, the single agent's state is FP
+            elif self.state_type == 'mixer': 
                 raise NotImplementedError
 
         if (
@@ -170,7 +190,7 @@ class OffPolicyBaseRunner:
             self.value_normalizer = None
 
         if self.algo_args["train"]["model_dir"] is not None:
-            self.restore()
+            self.restore() # 模型存储路径在此，可以通过修改这里的存储路径来加载模型
 
         self.total_it = 0  # total iteration
 
@@ -208,6 +228,11 @@ class OffPolicyBaseRunner:
 
     def run(self):
         """Run the training (or rendering) pipeline."""
+        not_raise_time = 0 # 记录多少次没有提升，准备课程学习
+        best_episode = 0
+        episode = 0
+        # 记录环境步数
+        env_run_time = 5
         if self.algo_args["render"]["use_render"]:  # render, not train
             self.render()
             return
@@ -218,14 +243,20 @@ class OffPolicyBaseRunner:
         # warmup
         print("start warmup")
         obs, share_obs, available_actions = self.warmup()
-        print("finish warmup, start training")
+        print("finish warmup")
+        print("训练前的表现如下")
+        self.eval(self.algo_args["train"]["warmup_steps"],env_run_time)
+        print()
+        print("训练开始")
+        # 开始时间
+        start = time.time()
         # train and eval
         steps = (
             self.algo_args["train"]["num_env_steps"]
             // self.algo_args["train"]["n_rollout_threads"]
         )
-        update_num = int(  # update number per train
-            self.algo_args["train"]["update_per_train"]
+        update_num = int(  # update number per train: 每次过train_interval的步数，才一次训练很多次
+            self.algo_args["train"]["update_per_train"] # 平均每个环境步训练的次数
             * self.algo_args["train"]["train_interval"]
         )
         for step in range(1, steps + 1):
@@ -262,6 +293,7 @@ class OffPolicyBaseRunner:
                 if len(np.array(available_actions).shape) == 3
                 else None,
             )
+            
             self.insert(data)
             obs = new_obs
             share_obs = new_share_obs
@@ -277,15 +309,37 @@ class OffPolicyBaseRunner:
                 for _ in range(update_num):
                     self.train()
             if step % self.algo_args["train"]["eval_interval"] == 0:
+                episode += 1
                 cur_step = (
                     self.algo_args["train"]["warmup_steps"]
                     + step * self.algo_args["train"]["n_rollout_threads"]
                 )
+                print()
+                print("cur_step: ", cur_step)
                 if self.algo_args["eval"]["use_eval"]:
-                    print(
-                        f"Env {self.args['env']} Task {self.task_name} Algo {self.args['algo']} Exp {self.args['exp_name']} Evaluation at step {cur_step} / {self.algo_args['train']['num_env_steps']}:"
-                    )
-                    self.eval(cur_step)
+                    end = time.time()
+                    print(f"""Env {self.args['env']} Task {self.task_name} Algo {self.args['algo']} Exp {self.args['exp_name']} Evaluation at step {cur_step} / {self.algo_args['train']['num_env_steps']}: Episode {episode} 
+FPS {int((cur_step-self.algo_args["train"]["warmup_steps"]) / (end - start))}. Max envirnoment step is {env_run_time}""")
+                    self.eval(cur_step,env_run_time)
+                    if self.eval_avg_rew > self.last_eval_avg_rew:
+                        self.save(better=True)
+                        self.last_eval_avg_rew = self.eval_avg_rew
+                        print("Better")
+                        
+                        not_raise_time = 0
+                        best_episode = episode
+                    else:
+                        print(f"""Episode {episode} Not Better than episode: {best_episode} Max reward {self.last_eval_avg_rew}, Max envirnoment step is {env_run_time}""")
+                        self.save(better=False)
+                        # 课程学习
+                        not_raise_time = not_raise_time + 1
+                        if not_raise_time > 10:
+                            env_run_time = env_run_time + 5
+                            self.envs.raise_difficulty(env_run_time)
+                            not_raise_time = 0
+                            self.last_eval_avg_rew -= 10 # 降低难度后，将上一次记录的平均奖励降低10,避免再也达不到更高
+                        if env_run_time > 200: # 当环境最大步数达到200时，停止训练
+                            break
                 else:
                     print(
                         f"Env {self.args['env']} Task {self.task_name} Algo {self.args['algo']} Exp {self.args['exp_name']} Step {cur_step} / {self.algo_args['train']['num_env_steps']}, average step reward in buffer: {self.buffer.get_mean_rewards()}.\n"
@@ -302,7 +356,8 @@ class OffPolicyBaseRunner:
                         )
                         self.log_file.flush()
                         self.done_episodes_rewards = []
-                self.save()
+                        
+                        self.save()
 
     def warmup(self):
         """Warmup the replay buffer with random actions"""
@@ -364,6 +419,14 @@ class OffPolicyBaseRunner:
             next_available_actions,  # None or (n_agents, n_threads, next_action_number)
         ) = data
 
+        
+        # print("dones", dones)
+        
+        
+        # In my SearchGrid env, dones is in the shape [n_threads,]
+        # Now I need to expand it to [n_threads, n_agents]
+        
+        # origin code 
         dones_env = np.all(dones, axis=1)  # if all agents are done, then env is done
         reward_env = np.mean(rewards, axis=1).flatten()
         self.train_episode_rewards += reward_env
@@ -386,17 +449,20 @@ class OffPolicyBaseRunner:
                         terms[i][0] = True
         elif self.state_type == "FP":
             terms = np.full(
-                (self.algo_args["train"]["n_rollout_threads"], self.num_agents, 1),
+                (self.
+                 algo_args["train"]["n_rollout_threads"], self.num_agents, 1),
                 False,
             )
+            
+            # origin code
             for i in range(self.algo_args["train"]["n_rollout_threads"]):
                 for agent_id in range(self.num_agents):
                     if dones[i][agent_id]:
-                        if not (
-                            "bad_transition" in infos[i][agent_id].keys()
-                            and infos[i][agent_id]["bad_transition"] == True
-                        ):
-                            terms[i][agent_id][0] = True
+                        # if not (
+                        #     "bad_transition" in infos[i][agent_id].keys()
+                        #     and infos[i][agent_id]["bad_transition"] == True
+                        # ):
+                        terms[i][agent_id][0] = True
 
         for i in range(self.algo_args["train"]["n_rollout_threads"]):
             if dones_env[i]:
@@ -405,10 +471,11 @@ class OffPolicyBaseRunner:
                 self.agent_deaths = np.zeros(
                     (self.algo_args["train"]["n_rollout_threads"], self.num_agents, 1)
                 )
-                if "original_obs" in infos[i][0]:
-                    next_obs[i] = infos[i][0]["original_obs"].copy()
-                if "original_state" in infos[i][0]:
-                    next_share_obs[i] = infos[i][0]["original_state"].copy()
+                # origin code
+                # if "original_obs" in infos[i][0]:
+                #     next_obs[i] = infos[i][0]["original_obs"].copy()
+                # if "original_state" in infos[i][0]:
+                #     next_share_obs[i] = infos[i][0]["original_state"].copy()
 
         if self.state_type == "EP":
             data = (
@@ -425,6 +492,7 @@ class OffPolicyBaseRunner:
                 next_available_actions,  # None or (n_agents, n_threads, next_action_number)
             )
         elif self.state_type == "FP":
+            # print("shape of share_obs: ", share_obs.shape)
             data = (
                 share_obs,  # (n_threads, n_agents, share_obs_dim)
                 obs,  # (n_agents, n_threads, obs_dim)
@@ -463,7 +531,7 @@ class OffPolicyBaseRunner:
                     )
             actions.append(action)
         if self.envs.action_space[agent_id].__class__.__name__ == "Discrete":
-            return np.expand_dims(np.array(actions).transpose(1, 0), axis=-1)
+            return np.expand_dims(np.array(actions).transpose(1, 0), axis=-1) # (n_threads, n_agents, 1)
 
         return np.array(actions).transpose(1, 0, 2)
 
@@ -514,7 +582,7 @@ class OffPolicyBaseRunner:
         raise NotImplementedError
 
     @torch.no_grad()
-    def eval(self, step):
+    def eval(self, step, env_run_time):
         """Evaluate the model"""
         eval_episode_rewards = []
         one_episode_rewards = []
@@ -528,9 +596,9 @@ class OffPolicyBaseRunner:
             eval_score_cnt = 0
         episode_lens = []
         one_episode_len = np.zeros(
-            self.algo_args["eval"]["n_eval_rollout_threads"], dtype=np.int
+            self.algo_args["eval"]["n_eval_rollout_threads"], dtype=int
         )
-
+        self.eval_envs.set_difficulty(env_run_time)
         eval_obs, eval_share_obs, eval_available_actions = self.eval_envs.reset()
 
         while True:
@@ -555,19 +623,19 @@ class OffPolicyBaseRunner:
             for eval_i in range(self.algo_args["eval"]["n_eval_rollout_threads"]):
                 if eval_dones_env[eval_i]:
                     eval_episode += 1
-                    if "smac" in self.args["env"]:
-                        if "v2" in self.args["env"]:
-                            if eval_infos[eval_i][0]["battle_won"]:
-                                eval_battles_won += 1
-                        else:
-                            if eval_infos[eval_i][0]["won"]:
-                                eval_battles_won += 1
-                    if "football" in self.args["env"]:
-                        if eval_infos[eval_i][0]["score_reward"] > 0:
-                            eval_score_cnt += 1
+                    # if "smac" in self.args["env"]:
+                    #     if "v2" in self.args["env"]:
+                    #         if eval_infos[eval_i][0]["battle_won"]:
+                    #             eval_battles_won += 1
+                    #     else:
+                    #         if eval_infos[eval_i][0]["won"]:
+                    #             eval_battles_won += 1
+                    # if "football" in self.args["env"]:
+                    #     if eval_infos[eval_i][0]["score_reward"] > 0:
+                    #         eval_score_cnt += 1
                     eval_episode_rewards[eval_i].append(
                         np.sum(one_episode_rewards[eval_i], axis=0)
-                    )
+                    ) # record the return of one episode
                     one_episode_rewards[eval_i] = []
                     episode_lens.append(one_episode_len[eval_i].copy())
                     one_episode_len[eval_i] = 0
@@ -577,23 +645,25 @@ class OffPolicyBaseRunner:
                 eval_episode_rewards = np.concatenate(
                     [rewards for rewards in eval_episode_rewards if rewards]
                 )
-                eval_avg_rew = np.mean(eval_episode_rewards)
+                print("eval_episode_rewards shape: ", eval_episode_rewards.shape)
+                self.eval_avg_rew = np.mean(eval_episode_rewards) # record the mean return of all episodes
+                self.eval_avg_rew = self.eval_avg_rew / env_run_time
                 eval_avg_len = np.mean(episode_lens)
                 if "smac" in self.args["env"]:
                     print(
                         "Eval win rate is {}, eval average episode rewards is {}, eval average episode length is {}.".format(
-                            eval_battles_won / eval_episode, eval_avg_rew, eval_avg_len
+                            eval_battles_won / eval_episode, self.eval_avg_rew, eval_avg_len
                         )
                     )
                 elif "football" in self.args["env"]:
                     print(
                         "Eval score rate is {}, eval average episode rewards is {}, eval average episode length is {}.".format(
-                            eval_score_cnt / eval_episode, eval_avg_rew, eval_avg_len
+                            eval_score_cnt / eval_episode, self.eval_avg_rew, eval_avg_len
                         )
                     )
                 else:
                     print(
-                        f"Eval average episode reward is {eval_avg_rew}, eval average episode length is {eval_avg_len}.\n"
+                        f"Eval average episode reward is {self.eval_avg_rew}, eval average episode length is {eval_avg_len}.\n"
                     )
                 if "smac" in self.args["env"]:
                     self.log_file.write(
@@ -602,7 +672,7 @@ class OffPolicyBaseRunner:
                                 str,
                                 [
                                     step,
-                                    eval_avg_rew,
+                                    self.eval_avg_rew,
                                     eval_avg_len,
                                     eval_battles_won / eval_episode,
                                 ],
@@ -617,7 +687,7 @@ class OffPolicyBaseRunner:
                                 str,
                                 [
                                     step,
-                                    eval_avg_rew,
+                                    self.eval_avg_rew,
                                     eval_avg_len,
                                     eval_score_cnt / eval_episode,
                                 ],
@@ -627,11 +697,11 @@ class OffPolicyBaseRunner:
                     )
                 else:
                     self.log_file.write(
-                        ",".join(map(str, [step, eval_avg_rew, eval_avg_len])) + "\n"
+                        ",".join(map(str, [step, self.eval_avg_rew, eval_avg_len])) + "\n"
                     )
                 self.log_file.flush()
                 self.writter.add_scalar(
-                    "eval_average_episode_rewards", eval_avg_rew, step
+                    "eval_average_episode_rewards", self.eval_avg_rew, step
                 )
                 self.writter.add_scalar(
                     "eval_average_episode_length", eval_avg_len, step
@@ -721,16 +791,26 @@ class OffPolicyBaseRunner:
                 )
                 self.value_normalizer.load_state_dict(value_normalizer_state_dict)
 
-    def save(self):
+    def save(self, better=True):
         """Save the model"""
-        for agent_id in range(self.num_agents):
-            self.actor[agent_id].save(self.save_dir, agent_id)
-        self.critic.save(self.save_dir)
-        if self.value_normalizer is not None:
-            torch.save(
-                self.value_normalizer.state_dict(),
-                str(self.save_dir) + "/value_normalizer" + ".pt",
-            )
+        if better:
+            for agent_id in range(self.num_agents):
+                self.actor[agent_id].save(self.save_dir, agent_id, better)
+            self.critic.save(self.save_dir, better)
+            if self.value_normalizer is not None:
+                torch.save(
+                    self.value_normalizer.state_dict(),
+                    str(self.save_dir) + "/value_normalizer" + ".pt",
+                )
+        else:
+            for agent_id in range(self.num_agents):
+                self.actor[agent_id].save(self.save_dir, agent_id, better)
+            self.critic.save(self.save_dir, better)
+            if self.value_normalizer is not None:
+                torch.save(
+                    self.value_normalizer.state_dict(),
+                    str(self.save_dir) + "/value_normalizer_current" + ".pt",
+                )
 
     def close(self):
         """Close environment, writter, and log file."""

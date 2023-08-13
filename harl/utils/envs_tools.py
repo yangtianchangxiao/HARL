@@ -4,7 +4,9 @@ import random
 import numpy as np
 import torch
 from harl.envs.env_wrappers import ShareSubprocVecEnv, ShareDummyVecEnv
-
+import sys
+sys.path.append("/home/cx/happo/envs/EnvDrone/classic_control")
+import env_Drones4 as EnvDrone4
 
 def check(value):
     """Check if value is a numpy array, if so, convert it to a torch tensor."""
@@ -46,16 +48,18 @@ def get_shape_from_act_space(act_space):
     return act_shape
 
 
-def make_train_env(env_name, seed, n_threads, env_args):
+def make_train_env(env_name, seed, n_threads, env_args, mapset, map_num):
     """Make env for training."""
     if env_name == "dexhands":
         from harl.envs.dexhands.dexhands_env import DexHandsEnv
 
         return DexHandsEnv({"n_threads": n_threads, **env_args})
-
+    # print("env name: ", env_name)
     def get_env_fn(rank):
         def init_env():
-            if env_name == "smac":
+            if env_name == "EnvDrone4":
+                env = EnvDrone4.SearchGrid(mapset, map_num)
+            elif env_name == "smac":
                 from harl.envs.smac.StarCraft2_Env import StarCraft2Env
 
                 env = StarCraft2Env(env_args)
@@ -91,7 +95,6 @@ def make_train_env(env_name, seed, n_threads, env_args):
                 env = FootballEnv(env_args)
             elif env_name == "lag":
                 from harl.envs.lag.lag_env import LAGEnv
-
                 env = LAGEnv(env_args)
             else:
                 print("Can not support the " + env_name + "environment.")
@@ -107,14 +110,17 @@ def make_train_env(env_name, seed, n_threads, env_args):
         return ShareSubprocVecEnv([get_env_fn(i) for i in range(n_threads)])
 
 
-def make_eval_env(env_name, seed, n_threads, env_args):
+def make_eval_env(env_name, seed, n_threads, env_args, mapset, map_num):
     """Make env for evaluation."""
     if env_name == "dexhands":  # dexhands does not support running multiple instances
         raise NotImplementedError
+    print("eavl env name: ", env_name)
 
     def get_env_fn(rank):
         def init_env():
-            if env_name == "smac":
+            if env_name == "EnvDrone4":
+                env = EnvDrone4.SearchGrid(mapset, map_num)
+            elif env_name == "smac":
                 from harl.envs.smac.StarCraft2_Env import StarCraft2Env
 
                 env = StarCraft2Env(env_args)
@@ -166,6 +172,7 @@ def make_render_env(env_name, seed, env_args):
     manual_expand_dims = True  # manually expand the num_of_parallel_envs dimension
     manual_delay = True  # manually delay the rendering by time.sleep()
     env_num = 1  # number of parallel envs
+    print("Render env name: ", env_name)
     if env_name == "smac":
         from harl.envs.smac.StarCraft2_Env import StarCraft2Env
 
@@ -256,4 +263,6 @@ def get_num_agents(env, env_args, envs):
     elif env == "dexhands":
         return envs.n_agents
     elif env == "lag":
+        return envs.n_agents
+    elif env == "EnvDrone4":
         return envs.n_agents

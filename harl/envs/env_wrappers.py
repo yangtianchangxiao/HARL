@@ -36,6 +36,8 @@ class CloudpickleWrapper(object):
 
     def __init__(self, x):
         self.x = x
+        
+        self.n_agents = 2
 
     def __getstate__(self):
         import cloudpickle
@@ -165,7 +167,9 @@ class ShareVecEnv(ABC):
 
 def shareworker(remote, parent_remote, env_fn_wrapper):
     parent_remote.close()
-    env = env_fn_wrapper.x()
+    print
+    env = env_fn_wrapper.x
+    env.n_agents = env.drone_num
     while True:
         cmd, data = remote.recv()
         if cmd == "step":
@@ -174,17 +178,17 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
                 if (
                     done
                 ):  # if done, save the original obs, state, and available actions in info, and then reset
-                    info[0]["original_obs"] = copy.deepcopy(ob)
-                    info[0]["original_state"] = copy.deepcopy(s_ob)
-                    info[0]["original_avail_actions"] = copy.deepcopy(available_actions)
+                    # info[0]["original_obs"] = copy.deepcopy(ob)
+                    # info[0]["original_state"] = copy.deepcopy(s_ob)
+                    # info[0]["original_avail_actions"] = copy.deepcopy(available_actions)
                     ob, s_ob, available_actions = env.reset()
             else:
                 if np.all(
                     done
                 ):  # if done, save the original obs, state, and available actions in info, and then reset
-                    info[0]["original_obs"] = copy.deepcopy(ob)
-                    info[0]["original_state"] = copy.deepcopy(s_ob)
-                    info[0]["original_avail_actions"] = copy.deepcopy(available_actions)
+                    # info[0]["original_obs"] = copy.deepcopy(ob)
+                    # info[0]["original_state"] = copy.deepcopy(s_ob)
+                    # info[0]["original_avail_actions"] = copy.deepcopy(available_actions)
                     ob, s_ob, available_actions = env.reset()
 
             remote.send((ob, s_ob, reward, done, info, available_actions))
@@ -217,22 +221,23 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
             raise NotImplementedError
 
 
-class ShareSubprocVecEnv(ShareVecEnv):
+class   ShareSubprocVecEnv(ShareVecEnv):
     def __init__(self, env_fns, spaces=None):
         """
         envs: list of gym environments to run in subprocesses
         """
         self.waiting = False
         self.closed = False
-        nenvs = len(env_fns)
-        self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
+        self.nenvs = len(env_fns)
+        self.env_fns = [env_fn() for env_fn in env_fns]
+        self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(self.nenvs)])
         self.ps = [
             Process(
                 target=shareworker,
                 args=(work_remote, remote, CloudpickleWrapper(env_fn)),
             )
             for (work_remote, remote, env_fn) in zip(
-                self.work_remotes, self.remotes, env_fns
+                self.work_remotes, self.remotes, self.env_fns
             )
         ]
         for p in self.ps:
@@ -248,10 +253,20 @@ class ShareSubprocVecEnv(ShareVecEnv):
         observation_space, share_observation_space, action_space = self.remotes[
             0
         ].recv()
+        
+        # print("observation_space: ", observation_space)
+        # print("share_observation_space: ", share_observation_space)
+        # print("action_space: ", action_space)
         ShareVecEnv.__init__(
-            self, len(env_fns), observation_space, share_observation_space, action_space
+            self, len(self.env_fns), [observation_space for _ in range(self.n_agents)], [share_observation_space for _ in range(self.n_agents)], [action_space for _ in range(self.n_agents)]
         )
-
+    def raise_difficulty(self, env_run_time):
+        for env in self.env_fns:
+            env.run_time = env_run_time
+    def set_difficulty(self, env_run_time):
+        for env in self.env_fns:
+            env.run_time = env_run_time 
+        
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
             remote.send(("step", action))

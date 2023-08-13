@@ -77,13 +77,18 @@ class HASAC(OffPolicyBase):
             logp_actions = torch.cat(logp_actions, dim=-1)
         return actions, logp_actions
 
-    def save(self, save_dir, id):
+    def save(self, save_dir, id, better = True):
         """Save the actor."""
-        torch.save(
-            self.actor.state_dict(), str(save_dir) + "/actor_agent" + str(id) + ".pt"
-        )
-
+        if better:
+            torch.save(
+                self.actor.state_dict(), str(save_dir) + "/actor_agent" + str(id) + ".pt"
+            )
+        else:
+            torch.save(
+                self.actor.state_dict(), str(save_dir) + "/actor_agent" + str(id) + "_current.pt"
+            )
     def restore(self, model_dir, id):
         """Restore the actor."""
+        print("model_dir: ", model_dir)
         actor_state_dict = torch.load(str(model_dir) + "/actor_agent" + str(id) + ".pt")
         self.actor.load_state_dict(actor_state_dict)

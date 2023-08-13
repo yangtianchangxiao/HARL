@@ -137,19 +137,30 @@ class TwinContinuousQCritic:
         critic_loss.backward()
         self.critic_optimizer.step()
 
-    def save(self, save_dir):
+    def save(self, save_dir, better = True):
         """Save the model parameters."""
-        torch.save(self.critic.state_dict(), str(save_dir) + "/critic_agent" + ".pt")
-        torch.save(
-            self.target_critic.state_dict(),
-            str(save_dir) + "/target_critic_agent" + ".pt",
-        )
-        torch.save(self.critic2.state_dict(), str(save_dir) + "/critic_agent2" + ".pt")
-        torch.save(
-            self.target_critic2.state_dict(),
-            str(save_dir) + "/target_critic_agent2" + ".pt",
-        )
-
+        if better:
+            torch.save(self.critic.state_dict(), str(save_dir) + "/critic_agent" + ".pt")
+            torch.save(
+                self.target_critic.state_dict(),
+                str(save_dir) + "/target_critic_agent" + ".pt",
+            )
+            torch.save(self.critic2.state_dict(), str(save_dir) + "/critic_agent2" + ".pt")
+            torch.save(
+                self.target_critic2.state_dict(),
+                str(save_dir) + "/target_critic_agent2" + ".pt",
+            )
+        else:
+            torch.save(self.critic.state_dict(), str(save_dir) + "/critic_agent" + "_current.pt")
+            torch.save(
+                self.target_critic.state_dict(),
+                str(save_dir) + "/target_critic_agent" + "_current.pt",
+            )
+            torch.save(self.critic2.state_dict(), str(save_dir) + "/critic_agent2" + "_current.pt")
+            torch.save(
+                self.target_critic2.state_dict(),
+                str(save_dir) + "/target_critic_agent2" + "_current.pt",
+            )
     def restore(self, model_dir):
         """Restore the model parameters."""
         critic_state_dict = torch.load(str(model_dir) + "/critic_agent" + ".pt")
