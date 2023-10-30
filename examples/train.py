@@ -9,8 +9,12 @@ import pickle
 sys.path.append('/home/cx/HARL')
 from harl.utils.configs_tools import get_defaults_yaml_args, update_args
 
+import objgraph
+
+# objgraph.show_growth(limit=10)  # 限制输出的对象类型数量
 
 def main():
+    
     """Main function."""
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter

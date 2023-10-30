@@ -2,11 +2,11 @@
 seed:
   # whether to use the specified seed
   seed_specify: True
-  # seed
+  # seed1=
   seed: 1
 device:
   # whether to use CUDA
-  cuda: 3
+  cuda: 0
   # whether to set CUDA deterministic
   cuda_deterministic: True 
   # arg to torch.set_num_threads
@@ -15,13 +15,13 @@ train:
   # number of parallel environments for training data collection
   n_rollout_threads: 20
   # number of total steps
-  num_env_steps: 20000000
+  num_env_steps: 200000000
   # number of warmup steps
   warmup_steps: 50000
   # number of steps per train
   train_interval: 300
   # ratio of training iterations to train_interval
-  update_per_train: 0.5
+  update_per_train: 0.05
   # logging interval (currently unused)
   log_interval: ~
   # evaluation interval
@@ -33,14 +33,15 @@ train:
   # whether to consider the case of truncation when an episode is done
   use_proper_time_limits: True
   # if set, load models from this directory; otherwise, randomly initialise the models
-  model_dir: /home/cx/HARL/examples/results/EnvDrone4/EnvDrone4/hasac/test/seed-00001-2023-08-12-21-23-47/models
+  # model_dir: /home/cx/HARL/examples/results/EnvDrone4/EnvDrone4/hasac/test/seed-00001-2023-08-12-21-23-47/models
+  model_dir: ~
 eval:
   # whether to use evaluation
   use_eval: True # Just training, not do evaluation during the process.
   # number of parallel environments for evaluation
   n_eval_rollout_threads: 20
   # number of episodes per evaluation
-  eval_episodes: 40
+  eval_episodes: 20
 render:
   # whether to use render
   use_render: False
@@ -55,8 +56,7 @@ model:
   # whether to use feature normalization
   use_feature_normalization: True
   # final activation function, choose from sigmoid, tanh, relu, leaky_relu, selu
-  final_activation_func: tanh
-  # initialization method for network parameters, choose from xavier_uniform_, orthogonal_, ...
+  final_activation_func: tanh191sou
   initialization_method: orthogonal_
   # gain of the output layer of the network.
   gain: 0.01
@@ -79,9 +79,9 @@ algo:
   # discount factor
   gamma: 0.99
   # off-policy buffer size
-  buffer_size: 1000000
+  buffer_size: 100000
   # training batch size
-  batch_size: 3000
+  batch_size: 2500
   # coefficient for target model soft update
   polyak: 0.005
   # the number of steps to look ahead

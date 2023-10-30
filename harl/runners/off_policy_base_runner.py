@@ -77,6 +77,7 @@ class OffPolicyBaseRunner:
                 self.env_num,
             ) = make_render_env(args["env"], algo_args["seed"]["seed"], env_args)
         else:  # make envs for training and evaluation
+            
             self.envs = make_train_env(
                 args["env"],
                 algo_args["seed"]["seed"],
@@ -232,7 +233,7 @@ class OffPolicyBaseRunner:
         best_episode = 0
         episode = 0
         # 记录环境步数
-        env_run_time = 5
+        env_run_time = 10
         if self.algo_args["render"]["use_render"]:  # render, not train
             self.render()
             return
@@ -321,6 +322,7 @@ class OffPolicyBaseRunner:
                     print(f"""Env {self.args['env']} Task {self.task_name} Algo {self.args['algo']} Exp {self.args['exp_name']} Evaluation at step {cur_step} / {self.algo_args['train']['num_env_steps']}: Episode {episode} 
 FPS {int((cur_step-self.algo_args["train"]["warmup_steps"]) / (end - start))}. Max envirnoment step is {env_run_time}""")
                     self.eval(cur_step,env_run_time)
+                
                     if self.eval_avg_rew > self.last_eval_avg_rew:
                         self.save(better=True)
                         self.last_eval_avg_rew = self.eval_avg_rew
@@ -329,15 +331,15 @@ FPS {int((cur_step-self.algo_args["train"]["warmup_steps"]) / (end - start))}. M
                         not_raise_time = 0
                         best_episode = episode
                     else:
-                        print(f"""Episode {episode} Not Better than episode: {best_episode} Max reward {self.last_eval_avg_rew}, Max envirnoment step is {env_run_time}""")
                         self.save(better=False)
                         # 课程学习
                         not_raise_time = not_raise_time + 1
-                        if not_raise_time > 10:
-                            env_run_time = env_run_time + 5
-                            self.envs.raise_difficulty(env_run_time)
+                        if not_raise_time > 40:
+                            env_run_time = env_run_time + 10
+                            self.envs.raise_difficulty()
                             not_raise_time = 0
                             self.last_eval_avg_rew -= 10 # 降低难度后，将上一次记录的平均奖励降低10,避免再也达不到更高
+                        print(f"""Episode {episode} Not Better than episode: {best_episode} Max reward {self.last_eval_avg_rew}, Max envirnoment step is {env_run_time}""")
                         if env_run_time > 200: # 当环境最大步数达到200时，停止训练
                             break
                 else:
@@ -598,7 +600,6 @@ FPS {int((cur_step-self.algo_args["train"]["warmup_steps"]) / (end - start))}. M
         one_episode_len = np.zeros(
             self.algo_args["eval"]["n_eval_rollout_threads"], dtype=int
         )
-        self.eval_envs.set_difficulty(env_run_time)
         eval_obs, eval_share_obs, eval_available_actions = self.eval_envs.reset()
 
         while True:
@@ -663,7 +664,7 @@ FPS {int((cur_step-self.algo_args["train"]["warmup_steps"]) / (end - start))}. M
                     )
                 else:
                     print(
-                        f"Eval average episode reward is {self.eval_avg_rew}, eval average episode length is {eval_avg_len}.\n"
+                        f"Eval average episode reward is {self.eval_avg_rew}, eval average episode length is {eval_avg_len}, env_run_time is {env_run_time}.\n"
                     )
                 if "smac" in self.args["env"]:
                     self.log_file.write(
@@ -793,6 +794,7 @@ FPS {int((cur_step-self.algo_args["train"]["warmup_steps"]) / (end - start))}. M
 
     def save(self, better=True):
         """Save the model"""
+        print("save path ",self.save_dir)
         if better:
             for agent_id in range(self.num_agents):
                 self.actor[agent_id].save(self.save_dir, agent_id, better)

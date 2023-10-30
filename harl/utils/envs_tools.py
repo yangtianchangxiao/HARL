@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from harl.envs.env_wrappers import ShareSubprocVecEnv, ShareDummyVecEnv
 import sys
-sys.path.append("/home/cx/happo/envs/EnvDrone/classic_control")
+sys.path.append("/home/cx/HARL/harl/envs/EnvDrone/classic_control")
 import env_Drones4 as EnvDrone4
 
 def check(value):

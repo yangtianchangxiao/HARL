@@ -79,6 +79,7 @@ class HASAC(OffPolicyBase):
 
     def save(self, save_dir, id, better = True):
         """Save the actor."""
+        
         if better:
             torch.save(
                 self.actor.state_dict(), str(save_dir) + "/actor_agent" + str(id) + ".pt"

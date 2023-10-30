@@ -7,7 +7,7 @@ class PlainMLP(nn.Module):
 
     def __init__(self, sizes, activation_func, final_activation_func="identity"):
         super().__init__()
-        layers = []
+        layers = [] 
         for j in range(len(sizes) - 1):
             act = activation_func if j < len(sizes) - 2 else final_activation_func
             layers += [nn.Linear(sizes[j], sizes[j + 1]), get_active_func(act)]

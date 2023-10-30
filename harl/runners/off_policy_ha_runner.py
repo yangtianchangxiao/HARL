@@ -61,6 +61,16 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                 next_actions.append(
                     self.actor[agent_id].get_target_actions(sp_next_obs[agent_id])
                 )
+
+            print("sp_next_obs.shape is ", sp_next_obs.shape)
+            print("sp_actions.shape is", sp_actions.shape)
+            print("sp_reward.shape is ", sp_reward.shape)
+            print("sp_done.shape is ", sp_done.shape)
+            print("sp_term.shape is ", sp_term.shape)
+            print("sp_next_share_obs.shape is ", sp_next_share_obs.shape)
+            print("next_actions.shape is ", len(next_actions), next_actions[0].shape)
+            print("sp_gamma.shape is ", sp_gamma.shape)
+
             self.critic.train(
                 sp_share_obs,
                 sp_actions,
@@ -71,6 +81,8 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                 next_actions,
                 sp_gamma,
             )
+
+            
         self.critic.turn_off_grad()
         sp_valid_transition = torch.tensor(sp_valid_transition, device=self.device)
         if self.total_it % self.policy_freq == 0:

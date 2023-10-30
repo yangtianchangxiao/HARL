@@ -82,6 +82,10 @@ class ShareVecEnv(ABC):
         until step_async() is invoked again.
         """
         pass
+    @abstractmethod
+    def raise_difficulty(self):
+        pass
+
 
     @abstractmethod
     def step_async(self, actions):
@@ -168,7 +172,7 @@ class ShareVecEnv(ABC):
 def shareworker(remote, parent_remote, env_fn_wrapper):
     parent_remote.close()
     print
-    env = env_fn_wrapper.x
+    env = env_fn_wrapper.x()
     env.n_agents = env.drone_num
     while True:
         cmd, data = remote.recv()
@@ -192,6 +196,8 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
                     ob, s_ob, available_actions = env.reset()
 
             remote.send((ob, s_ob, reward, done, info, available_actions))
+        elif cmd == "raise_difficulty":
+            env.raise_difficulty()  # 假设你的环境类有此方法
         elif cmd == "reset":
             ob, s_ob, available_actions = env.reset()
             remote.send((ob, s_ob, available_actions))
@@ -221,7 +227,7 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
             raise NotImplementedError
 
 
-class   ShareSubprocVecEnv(ShareVecEnv):
+class ShareSubprocVecEnv(ShareVecEnv):
     def __init__(self, env_fns, spaces=None):
         """
         envs: list of gym environments to run in subprocesses
@@ -229,7 +235,7 @@ class   ShareSubprocVecEnv(ShareVecEnv):
         self.waiting = False
         self.closed = False
         self.nenvs = len(env_fns)
-        self.env_fns = [env_fn() for env_fn in env_fns]
+        self.env_fns = env_fns
         self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(self.nenvs)])
         self.ps = [
             Process(
@@ -260,12 +266,13 @@ class   ShareSubprocVecEnv(ShareVecEnv):
         ShareVecEnv.__init__(
             self, len(self.env_fns), [observation_space for _ in range(self.n_agents)], [share_observation_space for _ in range(self.n_agents)], [action_space for _ in range(self.n_agents)]
         )
-    def raise_difficulty(self, env_run_time):
-        for env in self.env_fns:
-            env.run_time = env_run_time
-    def set_difficulty(self, env_run_time):
-        for env in self.env_fns:
-            env.run_time = env_run_time 
+        
+    # 改名为raise_difficulty
+    def raise_difficulty(self):
+        for remote in self.remotes:
+            remote.send(('raise_difficulty', None))
+
+
         
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):

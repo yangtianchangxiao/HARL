@@ -16,6 +16,7 @@ class HAD3QN(OffPolicyBase):
         self.tpdv_a = dict(dtype=torch.int64, device=device)
         self.polyak = args["polyak"]
         self.lr = args["lr"]
+        print("args is ", args)
         self.epsilon = args["epsilon"]
         self.action_dim = act_space.n
 

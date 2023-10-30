@@ -6,7 +6,7 @@ from harl.models.base.mlp import MLPBase
 from harl.models.base.act import ACTLayer
 import sys
 sys.path.append("/home/cx/")
-from happo.algorithms.utils.attention_resnet_120 import Attention_model as Attention_model_resnet_120
+from harl.models.base.attention_resnet_120 import Attention_model as Attention_model_resnet_120
 
 
 class StochasticMlpPolicy(nn.Module):

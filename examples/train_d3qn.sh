@@ -1,0 +1,1 @@
+python train.py --algo had3qn --env EnvDrone4 --exp_name sparse

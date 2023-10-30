@@ -1,1 +1,1 @@
-python train.py --algo hasac --env EnvDrone4 --exp_name test
+python train.py --algo hasac --env EnvDrone4 --exp_name sparse
