@@ -20,10 +20,10 @@ HARL algorithms are our novel solutions to achieving effective multi-agent coope
 
 The following figure is an illustration of the *sequential update scheme*
 <div align="center">
-  <img src="./assets/maad_sus_3_23.png" width="100%"/>
+  <img src="./assets/maad_sus_8_20_have_white_background.jpg" width="100%"/>
 </div>
 
-For more details, please refer to our [HARL](http://arxiv.org/abs/2304.09870) and [MEHAML](https://arxiv.org/abs/2306.10715) papers.
+For more details, please refer to our [HARL](http://arxiv.org/abs/2304.09870) and [MEHARL](https://arxiv.org/abs/2306.10715) papers.
 
 
 ## Installation
@@ -33,7 +33,7 @@ For more details, please refer to our [HARL](http://arxiv.org/abs/2304.09870) an
 ```shell
 conda create -n harl python=3.8
 conda activate harl
-# install pytorch>=1.9.0 (CUDA>=11.0) manually
+# Install pytorch>=1.9.0 (CUDA>=11.0) manually
 git clone https://github.com/PKU-MARL/HARL.git
 cd HARL
 pip install -e .
@@ -84,14 +84,14 @@ pip install supersuit==3.7.0
 **Install Gym Suite (Except MuJoCo)**
 
 ```shell
-# gym
+# Install gym
 pip install gym
-# classic control
+# Install classic control
 pip install gym[classic_control]
-# box2d
+# Install box2d
 conda install -c anaconda swig
 pip install gym[box2d]
-# atari
+# Install atari
 pip install --upgrade pip setuptools wheel
 pip install opencv-python
 pip install atari-py
@@ -134,6 +134,8 @@ pip install "glfw>=2.5.1"
 pip install "Cython>=0.29.28"
 ```
 
+Note that [mujoco-py](https://github.com/openai/mujoco-py) is compatible with `mujoco210` (see [this](https://github.com/openai/mujoco-py#install-mujoco)). So please make sure to download `mujoco210` and extract it into the right place.
+
 
 
 ### Solve Dependencies
@@ -152,7 +154,7 @@ pip install importlib-metadata==4.13.0
 
 ### Training on Existing Environments
 
-To train an algorithm on a provided environment, users can modify yaml configuration files of the corresponding algorithm and environment under `harl/configs/algos_cfgs` and `harl/configs/envs_cfgs` as they wish, go to `examples` folder, and then start training with a one-liner `python train.py --algo <ALGO> --env <ENV> --exp_name <EXPERIMENT NAME>` or `python train.py --load_config <CONFIG FILE PATH>`, where the latter is mostly used when reproducing an experiment. We provide the **tuned configurations** for algorithms in each environments under `tuned_configs` folder. Users can **reproduce our results** by using `python train.py --load_config <TUNED CONFIG PATH>` and change `<TUNED CONFIG PATH>` to the absolute path of the tuned config file on their machine.
+To train an algorithm on a provided environment, users can modify yaml configuration files of the corresponding algorithm and environment under `harl/configs/algos_cfgs` and `harl/configs/envs_cfgs` as they wish, go to `examples` folder, and then start training with a one-liner `python train.py --algo <ALGO> --env <ENV> --exp_name <EXPERIMENT NAME>` or `python train.py --load_config <CONFIG FILE PATH> --exp_name <EXPERIMENT NAME>`, where the latter is mostly used when reproducing an experiment. We provide the **tuned configurations** for algorithms in each environments under `tuned_configs` folder. Users can **reproduce our results** by using `python train.py --load_config <TUNED CONFIG PATH> --exp_name <EXPERIMENT NAME>` and change `<TUNED CONFIG PATH>` to the absolute path of the tuned config file on their machine.
 
 During training, users receive continuous logging feedback in the terminal.
 
@@ -163,7 +165,7 @@ To enable batch running, we allow users to modify yaml configs in the command li
 ```shell
 for seed in $(seq 1 3)
 do
-	python train.py --algo happo --env smac --exp_name text --seed $seed
+	python train.py --algo happo --env smac --exp_name test --seed $seed
 done
 ```
 
@@ -209,16 +211,17 @@ After these steps, you can apply the algorithms immediately as above.
 ### Application Scope of Algorithms
 
 |        | Continuous action space | Discrete action space | Multi Discrete action space |
-|:------:| :---------------------: | :-------------------: |:---------------------------:|
-| HAPPO  | √                       | √                     |              √              |
-| HATRPO | √                       | √                     |                             |
-| HAA2C  | √                       | √                     |              √              |
-| HADDPG | √                       |                       |                             |
-| HATD3  | √                       |                       |                             |
-| HAD3QN |                         | √                     |                             |
-| HASAC  | √                       | √                     |              √              |
-| MAPPO  | √                       | √                     |              √              |
-| MADDPG | √                       |                       |                             |
+| :----: | :---------------------: | :-------------------: | :-------------------------: |
+| HAPPO  |            √            |           √           |              √              |
+| HATRPO |            √            |           √           |                             |
+| HAA2C  |            √            |           √           |              √              |
+| HADDPG |            √            |                       |                             |
+| HATD3  |            √            |                       |                             |
+| HAD3QN |                         |           √           |                             |
+| HASAC  |            √            |           √           |              √              |
+| MAPPO  |            √            |           √           |              √              |
+| MADDPG |            √            |                       |                             |
+| MATD3  |            √            |                       |                             |
 
 
 
@@ -232,7 +235,7 @@ After these steps, you can apply the algorithms immediately as above.
 
 ### MAMuJoCo
 
-HAPPO and HADDPG outperforms MAPPO and MADDPG; HAPPO and HATD3 are the most effective methods for heterogeneous-agent cooperation tasks.
+HAPPO, HADDPG, and HATD3 outperform MAPPO, MADDPG, and MATD3; HAPPO and HATD3 are the most effective methods for heterogeneous-agent cooperation tasks.
 
 <div align="center">
   <img src="./assets/mamujoco_on_policy_learning_curve.jpg" width="100%"/>
@@ -276,16 +279,16 @@ HAPPO consistently outperforms MAPPO, and is also better than the single-agent b
   <img src="./assets/dexhands_learning_curve.jpg" width="100%"/>
 </div>
 
-*The experiment results of HASAC will be updated soon.*
+*The experiment results of HASAC can be found at https://sites.google.com/view/meharl*
 
 ## Citation
 
-If you find our paper or this repository helpful in your research or project, please consider citing our works using the following BibTeX citation:
+This repository is affiliated with [Peking University](https://www.pku.edu.cn//) and [BIGAI](https://www.bigai.ai/). If you find our paper or this repository helpful in your research or project, please consider citing our works using the following BibTeX citation:
 
 ```tex
 @misc{zhong2023heterogeneousagent,
       title={Heterogeneous-Agent Reinforcement Learning}, 
-      author={Yifan Zhong and Jakub Grudzien Kuba and Siyi Hu and Jiaming Ji and Yaodong Yang},
+      author={Yifan Zhong and Jakub Grudzien Kuba and Xidong Feng and Siyi Hu and Jiaming Ji and Yaodong Yang},
       year={2023},
       eprint={2304.09870},
       archivePrefix={arXiv},
@@ -294,7 +297,7 @@ If you find our paper or this repository helpful in your research or project, pl
 ```
 ```tex
 @misc{liu2023maximum,
-      title={Maximum Entropy Heterogeneous-Agent Mirror Learning}, 
+      title={Maximum Entropy Heterogeneous-Agent Reinforcement Learning}, 
       author={Jiarong Liu and Yifan Zhong and Siyi Hu and Haobo Fu and Qiang Fu and Xiaojun Chang and Yaodong Yang},
       year={2023},
       eprint={2306.10715},
